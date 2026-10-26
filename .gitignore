@@ -1,0 +1,7 @@
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 실행 확인 기록
+.check/

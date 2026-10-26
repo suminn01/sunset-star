@@ -1,0 +1,35 @@
+# 노을별 서버 공통 설정
+# 비밀번호처럼 GitHub에 올리면 안 되는 값은 application-secret.yml에 따로 적습니다.
+# (application-secret.yml은 .gitignore에 들어 있어서 커밋되지 않아요)
+
+spring:
+  application:
+    name: sunset-star
+  config:
+    import: optional:classpath:application-secret.yml
+  datasource:
+    url: jdbc:mysql://localhost:3306/sunset_star?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&createDatabaseIfNotExist=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8080
+
+app:
+  cors:
+    allowed-origins: http://localhost:5173
+
+# Open-Meteo 설정
+# model: best_match = 위치에 맞는 모델 자동 선택
+# 기상청 데이터가 복구되면 kma_seamless로 바꿔서 비교할 수 있어요.
+open-meteo:
+  forecast-url: https://api.open-meteo.com/v1/forecast
+  air-quality-url: https://air-quality-api.open-meteo.com/v1/air-quality
+  geocoding-url: https://geocoding-api.open-meteo.com/v1/search
+  model: best_match

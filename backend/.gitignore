@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# VS Code
+.vscode/
+
+# 비밀 설정 (절대 커밋하지 않기)
+src/main/resources/application-secret.yml
+.env
+
+# 사진 업로드 폴더
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
