@@ -2,6 +2,9 @@ package com.sunsetstar.forecast;
 
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +17,13 @@ import static com.sunsetstar.forecast.SunsetScoreRules.*;
  *
  * 기준 숫자와 이유 문장은 SunsetScoreRules에 있고, 이 클래스는 "어떤 순서로 무엇을 비교하는지"만 담는다.
  * 같은 입력이면 항상 같은 점수가 나온다 (외부 호출 없음, 현재 시각을 쓰지 않음).
+ *
+ * 하는 일은 세 가지다.
+ * - forecast: Open-Meteo 응답 → 날짜마다 일몰 시각 값 고르기 → 점수 → 추천 시간 (7일치)
+ * - calculate: 일몰 시각 값(SunsetConditions) → 점수
+ * - recommend: 일몰 시각 + 점수 → 추천 시간 또는 쉬는 날 안내
+ *
+ * Open-Meteo를 직접 부르지는 않는다. 응답을 받아 넘기는 일은 4단계 Controller가 한다.
  */
 @Service
 public class SunsetScoreService {
@@ -25,6 +35,92 @@ public class SunsetScoreService {
     static final String AIR_NAME = "공기";
     static final String HUMIDITY_NAME = "습도·시정";
     static final String RAIN_NAME = "비";
+
+
+    // ===== 7일치 예보 =====
+
+    /**
+     * Open-Meteo 응답으로 날짜마다 노을 예보를 만든다.
+     *
+     * @param weather    날씨 응답 (필수)
+     * @param airQuality 미세먼지 응답. 대기질 API가 실패했으면 null로 넘겨도 되고, 그때는 ④ 공기를 빼고 계산한다
+     */
+    public List<DailySunsetForecast> forecast(OpenMeteoForecastResponse weather,
+                                              OpenMeteoAirQualityResponse airQuality) {
+        OpenMeteoForecastResponse.Daily daily = weather.daily();
+        List<DailySunsetForecast> days = new ArrayList<>();
+
+        for (int day = 0; day < daily.time().size(); day++) {
+            LocalDate date = daily.time().get(day);
+            LocalDateTime sunset = valueAt(daily.sunset(), day);
+            if (sunset == null) {
+                continue; // 일몰 시각이 없으면 그날은 계산할 수 없다
+            }
+            SunsetConditions conditions = conditionsAtSunset(weather.hourly(), airQuality, sunset);
+            SunsetScore score = calculate(conditions);
+            days.add(recommend(date, sunset, score));
+        }
+        return days;
+    }
+
+    /**
+     * 시간별 예보에서 일몰 시각의 값을 골라 SunsetConditions로 만든다.
+     *
+     * 시간별 예보는 정각(17:00, 18:00) 값만 있어서, 일몰 시각에서 가장 가까운 정각을 쓴다.
+     * 예: 일몰 17:32 → 18:00 값, 일몰 17:20 → 17:00 값
+     */
+    SunsetConditions conditionsAtSunset(OpenMeteoForecastResponse.Hourly hourly,
+                                        OpenMeteoAirQualityResponse airQuality,
+                                        LocalDateTime sunset) {
+        LocalDateTime sunsetHour = nearestHour(sunset);
+        int i = hourly.time().indexOf(sunsetHour);
+
+        Double visibilityM = valueAt(hourly.visibility(), i);
+        Double visibilityKm = visibilityM == null ? null : visibilityM / 1000.0;
+
+        // 일몰 정각 바로 앞 6시간의 강수량 합 (예: 일몰 18:00 → 12:00~17:00 값 6개)
+        Double rainBefore = sumBefore(hourly.precipitation(), i, AFTER_RAIN_HOURS_BEFORE_SUNSET);
+
+        Double pm25 = null;
+        if (airQuality != null && airQuality.hourly() != null) {
+            int airIndex = airQuality.hourly().time().indexOf(sunsetHour);
+            pm25 = valueAt(airQuality.hourly().pm25(), airIndex);
+        }
+
+        return new SunsetConditions(
+                valueAt(hourly.cloudCoverHigh(), i),
+                valueAt(hourly.cloudCoverMid(), i),
+                valueAt(hourly.cloudCoverLow(), i),
+                null, // ③ 서쪽 하늘은 5단계(F3)에서 채운다
+                pm25,
+                valueAt(hourly.humidity(), i),
+                visibilityKm,
+                valueAt(hourly.precipitation(), i),
+                rainBefore
+        );
+    }
+
+    // ===== 추천 시간 =====
+
+    /**
+     * 추천 시간을 정한다. 일몰 15분 전 ~ 일몰 20분 후 (예: 일몰 18:20 → 18:05 ~ 18:40).
+     * 점수가 30점 미만이면 추천 시간 대신 "오늘은 쉬어요"를 보여 준다.
+     */
+    public DailySunsetForecast recommend(LocalDate date, LocalDateTime sunset, SunsetScore score) {
+        if (score.score() < REST_SCORE_BELOW) {
+            return new DailySunsetForecast(date, sunset, score, null, null, REST_MESSAGE);
+        }
+        return new DailySunsetForecast(
+                date,
+                sunset,
+                score,
+                sunset.minusMinutes(RECOMMEND_MINUTES_BEFORE_SUNSET),
+                sunset.plusMinutes(RECOMMEND_MINUTES_AFTER_SUNSET),
+                STAY_AFTER_SUNSET_TIP
+        );
+    }
+
+    // ===== 점수 계산 =====
 
     public SunsetScore calculate(SunsetConditions c) {
         List<Factor> factors = new ArrayList<>();
@@ -98,6 +194,37 @@ public class SunsetScoreService {
             return new Factor(HUMIDITY_NAME, DAMP_POINTS, DAMP_REASON);
         }
         return new Factor(HUMIDITY_NAME, 0, null);
+    }
+
+    /** 가장 가까운 정각. 30분 이상이면 다음 정각으로 올린다. */
+    private LocalDateTime nearestHour(LocalDateTime time) {
+        LocalDateTime hour = time.truncatedTo(ChronoUnit.HOURS);
+        return time.getMinute() >= 30 ? hour.plusHours(1) : hour;
+    }
+
+    /** 목록의 index번째 값. 목록이 없거나 index가 범위 밖이면 null */
+    private <T> T valueAt(List<T> values, int index) {
+        if (values == null || index < 0 || index >= values.size()) {
+            return null;
+        }
+        return values.get(index);
+    }
+
+    /** index 바로 앞 hours개 값의 합. 빈 값은 0으로 본다. 하나도 읽을 수 없으면 null */
+    private Double sumBefore(List<Double> values, int index, int hours) {
+        if (values == null || index < 0) {
+            return null;
+        }
+        double sum = 0;
+        boolean found = false;
+        for (int k = Math.max(0, index - hours); k < index; k++) {
+            Double value = valueAt(values, k);
+            if (value != null) {
+                sum += value;
+                found = true;
+            }
+        }
+        return found ? sum : null;
     }
 
     /** 둘 중 큰 값. 하나만 있으면 그 값, 둘 다 없으면 null */
