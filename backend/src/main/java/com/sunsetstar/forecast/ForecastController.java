@@ -20,11 +20,16 @@ import java.time.LocalDate;
  * → 하루 상세: 노을 요소별 점수, 별 시간대별 점수, 달 정보 (ForecastDetailResponse)
  *
  * Controller는 "어떤 주소로 무엇을 받는지"만 정하고, 계산은 하지 않는다.
+ * 잘못된 값이 오면 GlobalExceptionHandler가 400 {code, message}로 답한다.
  * 로그인 없이 누구나 부를 수 있다 (기능명세서 F9 접근 제어).
  */
 @RestController
 @RequestMapping("/api/forecast")
 public class ForecastController {
+
+    // 범위 밖 값을 넣었을 때 에러 응답의 message로 나가는 문장
+    private static final String LAT_MESSAGE = "위도(lat)는 -90 ~ 90 사이여야 해요";
+    private static final String LON_MESSAGE = "경도(lon)는 -180 ~ 180 사이여야 해요";
 
     private final ForecastService forecastService;
 
@@ -41,8 +46,10 @@ public class ForecastController {
      */
     @GetMapping
     public ForecastResponse forecast(
-            @RequestParam @DecimalMin("-90") @DecimalMax("90") double lat,
-            @RequestParam @DecimalMin("-180") @DecimalMax("180") double lon,
+            @RequestParam @DecimalMin(value = "-90", message = LAT_MESSAGE)
+            @DecimalMax(value = "90", message = LAT_MESSAGE) double lat,
+            @RequestParam @DecimalMin(value = "-180", message = LON_MESSAGE)
+            @DecimalMax(value = "180", message = LON_MESSAGE) double lon,
             @RequestParam(defaultValue = "SUBURB") LightPollution light) {
         return forecastService.forecast(lat, lon, light);
     }
@@ -54,8 +61,10 @@ public class ForecastController {
      */
     @GetMapping("/detail")
     public ForecastDetailResponse detail(
-            @RequestParam @DecimalMin("-90") @DecimalMax("90") double lat,
-            @RequestParam @DecimalMin("-180") @DecimalMax("180") double lon,
+            @RequestParam @DecimalMin(value = "-90", message = LAT_MESSAGE)
+            @DecimalMax(value = "90", message = LAT_MESSAGE) double lat,
+            @RequestParam @DecimalMin(value = "-180", message = LON_MESSAGE)
+            @DecimalMax(value = "180", message = LON_MESSAGE) double lon,
             @RequestParam(defaultValue = "SUBURB") LightPollution light,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return forecastService.detail(lat, lon, light, date);

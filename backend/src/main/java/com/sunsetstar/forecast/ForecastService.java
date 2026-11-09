@@ -1,11 +1,11 @@
 package com.sunsetstar.forecast;
 
+import com.sunsetstar.global.ApiException;
+import com.sunsetstar.global.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,8 +30,9 @@ import java.util.Set;
  * 좌표는 소수점 둘째 자리로 반올림해서 쓴다(F6). 37.56651과 37.56649가 같은 37.57이 되어
  * 캐시를 함께 쓴다. 둘째 자리는 약 1km 간격이라 날씨 예보에는 차이가 없다.
  *
- * 미세먼지 API만 실패하면 공기를 빼고 계산한다(F8 "일부 데이터 없음").
- * 날씨 API가 실패하면 점수를 낼 수 없으므로 예외를 그대로 던진다(에러 응답은 다음 작업에서 만든다).
+ * 실패했을 때 (기능명세서 F8)
+ * - 날씨 API: 한 번 더 시도하고, 그래도 실패하면 503 WEATHER_UNAVAILABLE ("하늘 정보를 못 가져왔어요")
+ * - 미세먼지 API: 공기를 빼고 계산한다 ("일부 데이터 없음")
  */
 @Service
 public class ForecastService {
@@ -65,7 +66,7 @@ public class ForecastService {
     public ForecastResponse forecast(double latitude, double longitude, LightPollution light) {
         latitude = roundCoordinate(latitude);
         longitude = roundCoordinate(longitude);
-        OpenMeteoForecastResponse weather = client.getForecast(latitude, longitude);
+        OpenMeteoForecastResponse weather = fetchWeather(latitude, longitude);
         OpenMeteoAirQualityResponse airQuality = fetchAirQualityOrNull(latitude, longitude);
         return toResponse(weather, airQuality, latitude, longitude, light, now());
     }
@@ -97,12 +98,12 @@ public class ForecastService {
     /**
      * 하루 상세 예보를 만든다.
      *
-     * @throws ResponseStatusException 400: 예보 범위(오늘부터 7일) 밖의 날짜일 때
+     * @throws ApiException 400 INVALID_PARAMETER: 예보 범위(오늘부터 7일) 밖의 날짜일 때
      */
     public ForecastDetailResponse detail(double latitude, double longitude, LightPollution light, LocalDate date) {
         latitude = roundCoordinate(latitude);
         longitude = roundCoordinate(longitude);
-        OpenMeteoForecastResponse weather = client.getForecast(latitude, longitude);
+        OpenMeteoForecastResponse weather = fetchWeather(latitude, longitude);
         OpenMeteoAirQualityResponse airQuality = fetchAirQualityOrNull(latitude, longitude);
         return toDetail(weather, airQuality, latitude, longitude, light, date, now());
     }
@@ -113,7 +114,7 @@ public class ForecastService {
                                     LocalDate date, LocalDateTime basedAt) {
         int dayIndex = weather.daily().time().indexOf(date);
         if (dayIndex < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new ApiException(ErrorCode.INVALID_PARAMETER,
                     "예보가 있는 날짜가 아니에요. 오늘부터 7일 안의 날짜를 골라 주세요: " + date);
         }
         Scores scores = calculate(weather, airQuality, latitude, longitude, light);
@@ -148,6 +149,32 @@ public class ForecastService {
             stars.put(night.date(), night);
         }
         return new Scores(sunsets, stars);
+    }
+
+    /**
+     * 날씨를 받는다. 실패하면 한 번 더 시도하고, 그래도 실패하면 503으로 답한다.
+     * 일시적인 네트워크 문제는 바로 다시 시도하면 되는 경우가 많다.
+     */
+    private OpenMeteoForecastResponse fetchWeather(double latitude, double longitude) {
+        try {
+            return requireWeather(client.getForecast(latitude, longitude));
+        } catch (RestClientException first) {
+            log.warn("날씨 조회 실패, 한 번 더 시도합니다: {}", first.getMessage());
+        }
+        try {
+            return requireWeather(client.getForecast(latitude, longitude));
+        } catch (RestClientException second) {
+            log.error("날씨 조회 재시도도 실패했습니다: {}", second.getMessage());
+            throw new ApiException(ErrorCode.WEATHER_UNAVAILABLE);
+        }
+    }
+
+    /** 응답은 왔는데 내용이 비어 있으면 점수를 낼 수 없으므로 실패로 본다. */
+    private OpenMeteoForecastResponse requireWeather(OpenMeteoForecastResponse weather) {
+        if (weather == null || weather.hourly() == null || weather.daily() == null) {
+            throw new RestClientException("Open-Meteo 응답이 비어 있습니다");
+        }
+        return weather;
     }
 
     /** 미세먼지는 없어도 점수를 낼 수 있어서, 실패하면 기록만 남기고 null로 넘긴다. */
