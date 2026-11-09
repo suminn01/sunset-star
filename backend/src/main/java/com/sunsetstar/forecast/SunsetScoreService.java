@@ -196,8 +196,8 @@ public class SunsetScoreService {
         return new Factor(HUMIDITY_NAME, 0, null);
     }
 
-    /** 가장 가까운 정각. 30분 이상이면 다음 정각으로 올린다. */
-    private LocalDateTime nearestHour(LocalDateTime time) {
+    /** 가장 가까운 정각. 30분 이상이면 다음 정각으로 올린다. 서쪽 하늘 검사(WestSkyService)도 같은 기준을 쓴다. */
+    static LocalDateTime nearestHour(LocalDateTime time) {
         LocalDateTime hour = time.truncatedTo(ChronoUnit.HOURS);
         return time.getMinute() >= 30 ? hour.plusHours(1) : hour;
     }

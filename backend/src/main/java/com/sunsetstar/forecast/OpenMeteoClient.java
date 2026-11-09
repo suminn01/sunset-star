@@ -3,12 +3,15 @@ package com.sunsetstar.forecast;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Open-Meteo에 요청을 보내고, 받은 JSON을 DTO에 담아 돌려주는 클래스.
@@ -16,6 +19,7 @@ import java.time.Duration;
  * 하는 일은 두 가지다.
  * - getForecast: 7일치 시간별 구름·습도·시정·강수 + 날짜별 일출·일몰
  * - getAirQuality: 7일치 시간별 PM2.5·PM10
+ * - getLowCloud: 여러 지점의 7일치 시간별 낮은 구름 (해 지는 쪽 하늘 검사, 요청 1번)
  *
  * 주소와 모델명은 OpenMeteoProperties(application.yml)에서 꺼내 쓰고,
  * 이 클래스에는 "무엇을 달라고 할지"만 적는다.
@@ -116,5 +120,36 @@ public class OpenMeteoClient {
                         .build())
                 .retrieve()
                 .body(OpenMeteoAirQualityResponse.class);
+    }
+
+    /**
+     * 여러 지점의 낮은 구름을 한 번에 가져온다 (다중 좌표 요청, 기능명세서 F3).
+     * 위도·경도를 쉼표로 이어 보내면 Open-Meteo가 지점마다 응답 하나씩, 보낸 순서대로 배열로 돌려준다.
+     * 예: latitude=37.47,37.38,37.18&longitude=126.72,126.47,125.96 → [지점1, 지점2, 지점3]
+     *
+     * 지점이 1곳이면 배열이 아니라 응답 하나만 오므로, 항상 2곳 이상을 보낸다 (해 지는 쪽 검사는 하루 3곳).
+     */
+    @Cacheable("open-meteo-west-sky")
+    public List<OpenMeteoForecastResponse> getLowCloud(List<Coordinate> points) {
+        log.info("Open-Meteo 서쪽 하늘 요청: {}곳", points.size());
+        String latitudes = points.stream()
+                .map(point -> String.valueOf(point.latitude()))
+                .collect(Collectors.joining(","));
+        String longitudes = points.stream()
+                .map(point -> String.valueOf(point.longitude()))
+                .collect(Collectors.joining(","));
+
+        return restClient.get()
+                .uri(properties.forecastUrl(), uri -> uri
+                        .queryParam("latitude", latitudes)
+                        .queryParam("longitude", longitudes)
+                        .queryParam("hourly", "cloud_cover_low")
+                        .queryParam("models", properties.model())
+                        .queryParam("timezone", TIMEZONE)
+                        .queryParam("forecast_days", FORECAST_DAYS)
+                        .build())
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<OpenMeteoForecastResponse>>() {
+                });
     }
 }

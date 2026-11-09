@@ -14,7 +14,7 @@ spring:
   # maximumSize = 좌표를 최대 몇 개까지 기억할지, expireAfterWrite = 저장하고 얼마 뒤에 버릴지
   cache:
     type: caffeine
-    cache-names: open-meteo-forecast,open-meteo-air-quality
+    cache-names: open-meteo-forecast,open-meteo-air-quality,open-meteo-west-sky
     caffeine:
       spec: maximumSize=1000,expireAfterWrite=1h
   jpa:
