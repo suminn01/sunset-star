@@ -27,6 +27,9 @@ import java.util.Set;
  *    - forecast: 7일 카드 (등급 이름, 이유 한 줄, 4일째부터 "참고용")
  *    - detail: 하루 상세 (노을 요소별 점수, 별 시간대별 점수, 달 정보)
  *
+ * 좌표는 소수점 둘째 자리로 반올림해서 쓴다(F6). 37.56651과 37.56649가 같은 37.57이 되어
+ * 캐시를 함께 쓴다. 둘째 자리는 약 1km 간격이라 날씨 예보에는 차이가 없다.
+ *
  * 미세먼지 API만 실패하면 공기를 빼고 계산한다(F8 "일부 데이터 없음").
  * 날씨 API가 실패하면 점수를 낼 수 없으므로 예외를 그대로 던진다(에러 응답은 다음 작업에서 만든다).
  */
@@ -34,6 +37,9 @@ import java.util.Set;
 public class ForecastService {
 
     private static final Logger log = LoggerFactory.getLogger(ForecastService.class);
+
+    /** 좌표 반올림 자리: 소수점 둘째 자리 → 100 */
+    private static final double COORDINATE_SCALE = 100.0;
 
     /** 4일째(index 3)부터 "참고용" */
     static final int REFERENCE_FROM_DAY_INDEX = 3;
@@ -57,6 +63,8 @@ public class ForecastService {
 
     /** 좌표와 빛 공해 단계로 7일 예보를 만든다. */
     public ForecastResponse forecast(double latitude, double longitude, LightPollution light) {
+        latitude = roundCoordinate(latitude);
+        longitude = roundCoordinate(longitude);
         OpenMeteoForecastResponse weather = client.getForecast(latitude, longitude);
         OpenMeteoAirQualityResponse airQuality = fetchAirQualityOrNull(latitude, longitude);
         return toResponse(weather, airQuality, latitude, longitude, light, now());
@@ -92,6 +100,8 @@ public class ForecastService {
      * @throws ResponseStatusException 400: 예보 범위(오늘부터 7일) 밖의 날짜일 때
      */
     public ForecastDetailResponse detail(double latitude, double longitude, LightPollution light, LocalDate date) {
+        latitude = roundCoordinate(latitude);
+        longitude = roundCoordinate(longitude);
         OpenMeteoForecastResponse weather = client.getForecast(latitude, longitude);
         OpenMeteoAirQualityResponse airQuality = fetchAirQualityOrNull(latitude, longitude);
         return toDetail(weather, airQuality, latitude, longitude, light, date, now());
@@ -148,6 +158,11 @@ public class ForecastService {
             log.warn("미세먼지 조회 실패, 공기를 빼고 계산합니다: {}", e.getMessage());
             return null;
         }
+    }
+
+    /** 소수점 둘째 자리로 반올림한다. 37.5665 → 37.57, 126.978 → 126.98 */
+    static double roundCoordinate(double value) {
+        return Math.round(value * COORDINATE_SCALE) / COORDINATE_SCALE;
     }
 
     /** 예보 기준 시각 (정각) */

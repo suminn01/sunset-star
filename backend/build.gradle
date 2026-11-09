@@ -24,6 +24,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
+    // 캐시 저장소 (1시간 동안 Open-Meteo 응답을 메모리에 보관). 버전은 Spring Boot가 맞춰 준다
+    implementation 'com.github.ben-manes.caffeine:caffeine'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     // 해·달 계산 (천문박명 시각, 달 밝기·고도) - 별 점수(F4)에 사용

@@ -10,6 +10,13 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/sunset_star?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&createDatabaseIfNotExist=true
     driver-class-name: com.mysql.cj.jdbc.Driver
+  # 캐시: Open-Meteo 응답을 1시간 동안 메모리에 보관한다 (기능명세서 F6)
+  # maximumSize = 좌표를 최대 몇 개까지 기억할지, expireAfterWrite = 저장하고 얼마 뒤에 버릴지
+  cache:
+    type: caffeine
+    cache-names: open-meteo-forecast,open-meteo-air-quality
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=1h
   jpa:
     hibernate:
       ddl-auto: update
