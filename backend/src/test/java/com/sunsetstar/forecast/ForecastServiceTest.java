@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * ForecastService 테스트: 날씨 실패 시 재시도와 503, 좌표 반올림, 범위 밖 날짜.
  *
  * Open-Meteo 대신 FakeClient를 끼워서, 몇 번째 요청에 실패할지 정할 수 있다. 인터넷이 필요 없다.
+ * (미세먼지와 서쪽 하늘 요청은 항상 실패시켜서, 날씨만으로 점수가 나오는지도 함께 본다)
  */
 class ForecastServiceTest {
 
@@ -55,6 +56,11 @@ class ForecastServiceTest {
             throw new RestClientException("대기질 연결 실패 (테스트)");
         }
 
+        @Override
+        public List<OpenMeteoForecastResponse> getLowCloud(List<Coordinate> points) {
+            throw new RestClientException("서쪽 하늘 연결 실패 (테스트)");
+        }
+
         private OpenMeteoForecastResponse clearWeather() {
             List<LocalDateTime> time = new ArrayList<>();
             for (int h = 0; h < 48; h++) {
@@ -75,7 +81,8 @@ class ForecastServiceTest {
 
     private ForecastService serviceWith(FakeClient client) {
         SkyCalculator sky = new SkyCalculator();
-        return new ForecastService(client, new SunsetScoreService(), new StarScoreService(sky), sky);
+        return new ForecastService(client, new SunsetScoreService(), new StarScoreService(sky), sky,
+                new WestSkyService(client, sky));
     }
 
     @Test

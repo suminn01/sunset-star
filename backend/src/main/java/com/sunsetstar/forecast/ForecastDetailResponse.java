@@ -45,6 +45,7 @@ public record ForecastDetailResponse(
      * @param baseScore 기본 점수 (50). 목록 마지막 줄에 "기본 50점"으로 보여 준다
      * @param factors   0이 아닌 요소들 (①→⑥ 순서)
      * @param missing   값이 없어서 빼고 계산한 요소 이름
+     * @param westSky   해 지는 쪽 하늘 (방향 화살표, 지점 3곳 상태). 검사하지 못했으면 null
      */
     public record SunsetDetail(
             int score,
@@ -56,8 +57,29 @@ public record ForecastDetailResponse(
             String note,
             int baseScore,
             List<FactorLine> factors,
-            List<String> missing
+            List<String> missing,
+            WestSkyDetail westSky
     ) {
+    }
+
+    /**
+     * 해 지는 쪽 하늘 (기능명세서 F3 화면). 예: 서남서 249° → 25km 맑음, 50km 조금, 100km 막힘
+     *
+     * @param azimuth   해 지는 방향 (북쪽 0°, 서쪽 270°, 반올림한 정수). 화살표 각도로 쓴다
+     * @param direction 방향 이름 (예: "서남서")
+     * @param points    검사 지점 3곳 (가까운 순서)
+     */
+    public record WestSkyDetail(int azimuth, String direction, List<WestSkyPoint> points) {
+    }
+
+    /**
+     * 검사 지점 한 곳.
+     *
+     * @param distanceKm 거리 (25, 50, 100)
+     * @param lowCloud   낮은 구름양(%). 값이 없으면 null
+     * @param status     "맑음" / "조금" / "막힘". 값이 없으면 null
+     */
+    public record WestSkyPoint(int distanceKm, Integer lowCloud, String status) {
     }
 
     /**
