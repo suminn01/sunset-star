@@ -26,6 +26,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
+    // 해·달 계산 (천문박명 시각, 달 밝기·고도) - 별 점수(F4)에 사용
+    implementation 'org.shredzone.commons:commons-suncalc:3.11'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
