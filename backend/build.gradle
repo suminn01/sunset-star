@@ -31,6 +31,9 @@ dependencies {
     // 해·달 계산 (천문박명 시각, 달 밝기·고도) - 별 점수(F4)에 사용
     implementation 'org.shredzone.commons:commons-suncalc:3.11'
 
+    // Swagger: 브라우저에서 API를 눌러 실행해 보는 화면 (/swagger-ui). Spring Boot 4.1용 3.1.x
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

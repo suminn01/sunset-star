@@ -1,5 +1,8 @@
 package com.sunsetstar.forecast;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -23,6 +26,7 @@ import java.time.LocalDate;
  * 잘못된 값이 오면 GlobalExceptionHandler가 400 {code, message}로 답한다.
  * 로그인 없이 누구나 부를 수 있다 (기능명세서 F9 접근 제어).
  */
+@Tag(name = "예보", description = "노을·별 점수 예보 (로그인 없이 사용)")
 @RestController
 @RequestMapping("/api/forecast")
 public class ForecastController {
@@ -44,12 +48,16 @@ public class ForecastController {
      * @param lon   경도 (−180 ~ 180)
      * @param light 빛 공해 단계: CITY(도심) / SUBURB(교외) / RURAL(시골). 안 보내면 SUBURB
      */
+    @Operation(summary = "7일 예보", description = "오늘부터 7일 동안 날짜별 노을·별 점수, 등급, 이유 한 줄, 추천 시간")
     @GetMapping
     public ForecastResponse forecast(
+            @Parameter(description = "위도 (예: 37.5665)", example = "37.5665")
             @RequestParam @DecimalMin(value = "-90", message = LAT_MESSAGE)
             @DecimalMax(value = "90", message = LAT_MESSAGE) double lat,
+            @Parameter(description = "경도 (예: 126.978)", example = "126.978")
             @RequestParam @DecimalMin(value = "-180", message = LON_MESSAGE)
             @DecimalMax(value = "180", message = LON_MESSAGE) double lon,
+            @Parameter(description = "빛 공해 단계: CITY(도심) / SUBURB(교외) / RURAL(시골)")
             @RequestParam(defaultValue = "SUBURB") LightPollution light) {
         return forecastService.forecast(lat, lon, light);
     }
@@ -59,13 +67,18 @@ public class ForecastController {
      *
      * @param date 날짜 (yyyy-MM-dd, 오늘부터 7일 안)
      */
+    @Operation(summary = "하루 상세 예보", description = "노을 요소별 점수, 별 시간대별 점수, 달 밝기와 달 지는 시각")
     @GetMapping("/detail")
     public ForecastDetailResponse detail(
+            @Parameter(description = "위도 (예: 37.5665)", example = "37.5665")
             @RequestParam @DecimalMin(value = "-90", message = LAT_MESSAGE)
             @DecimalMax(value = "90", message = LAT_MESSAGE) double lat,
+            @Parameter(description = "경도 (예: 126.978)", example = "126.978")
             @RequestParam @DecimalMin(value = "-180", message = LON_MESSAGE)
             @DecimalMax(value = "180", message = LON_MESSAGE) double lon,
+            @Parameter(description = "빛 공해 단계: CITY(도심) / SUBURB(교외) / RURAL(시골)")
             @RequestParam(defaultValue = "SUBURB") LightPollution light,
+            @Parameter(description = "날짜 yyyy-MM-dd (오늘부터 7일 안)", example = "2026-11-09")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return forecastService.detail(lat, lon, light, date);
     }

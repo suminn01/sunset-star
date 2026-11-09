@@ -32,6 +32,15 @@ app:
   cors:
     allowed-origins: http://localhost:5173
 
+# Swagger (API 문서와 실행 화면): http://localhost:8080/swagger-ui
+# 배포할 때는 아무나 API 목록을 보지 못하도록 두 값을 false로 바꾼다.
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui
+
 # Open-Meteo 설정
 # model: best_match = 위치에 맞는 모델 자동 선택
 # 기상청 데이터가 복구되면 kma_seamless로 바꿔서 비교할 수 있어요.
