@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -257,6 +258,39 @@ class SunsetScoreServiceTest {
 
             assertThat(first.score().score()).isEqualTo(80); // 85에서 공기 +5가 빠짐
             assertThat(first.score().missing()).containsExactly("공기");
+        }
+
+        /** 첫날의 서쪽 하늘 검사 결과 (세 지점 중 최댓값만 점수에 쓰인다) */
+        private Map<LocalDate, WestSky> westSky(int maxLowCloud) {
+            WestSky westSky = new WestSky(249.0, "서남서", List.of(), maxLowCloud);
+            return Map.of(LocalDate.of(2026, 11, 9), westSky);
+        }
+
+        @Test
+        @DisplayName("서쪽 하늘이 막힌 날(최댓값 75%)은 점수가 20점 내려간다 (85 → 65)")
+        void westSkyBlocked() {
+            DailySunsetForecast first = service.forecast(weather(), airQuality(), westSky(75)).get(0);
+
+            assertThat(first.score().score()).isEqualTo(65);
+            assertThat(first.score().factors()).contains(
+                    new Factor("서쪽 하늘", -20, "해 지는 쪽에 구름 벽이 있어서 빛이 막힐 수 있어요"));
+        }
+
+        @Test
+        @DisplayName("서쪽 하늘이 트인 날(최댓값 10%)은 10점 올라간다 (85 → 95)")
+        void westSkyOpen() {
+            DailySunsetForecast first = service.forecast(weather(), airQuality(), westSky(10)).get(0);
+
+            assertThat(first.score().score()).isEqualTo(95);
+        }
+
+        @Test
+        @DisplayName("서쪽 하늘 검사 결과가 없는 날은 ③을 0점으로 둔다 (85 그대로)")
+        void westSkyMissing() {
+            DailySunsetForecast first = service.forecast(weather(), airQuality(), Map.of()).get(0);
+
+            assertThat(first.score().score()).isEqualTo(85);
+            assertThat(first.score().missing()).isEmpty();
         }
     }
 }

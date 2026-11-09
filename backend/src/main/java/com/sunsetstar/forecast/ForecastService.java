@@ -22,7 +22,8 @@ import java.util.Set;
  *
  * 순서
  * 1. OpenMeteoClient로 날씨와 미세먼지를 받는다
- * 2. SunsetScoreService, StarScoreService로 날짜마다 노을·별 점수를 계산한다
+ * 2. WestSkyService로 해 지는 쪽 하늘을 검사하고(노을 ③),
+ *    SunsetScoreService, StarScoreService로 날짜마다 노을·별 점수를 계산한다
  * 3. 화면 모양으로 바꾼다
  *    - forecast: 7일 카드 (등급 이름, 이유 한 줄, 4일째부터 "참고용")
  *    - detail: 하루 상세 (노을 요소별 점수, 별 시간대별 점수, 달 정보)
@@ -49,15 +50,18 @@ public class ForecastService {
     private final SunsetScoreService sunsetScoreService;
     private final StarScoreService starScoreService;
     private final SkyCalculator sky;
+    private final WestSkyService westSkyService;
 
     public ForecastService(OpenMeteoClient client,
                            SunsetScoreService sunsetScoreService,
                            StarScoreService starScoreService,
-                           SkyCalculator sky) {
+                           SkyCalculator sky,
+                           WestSkyService westSkyService) {
         this.client = client;
         this.sunsetScoreService = sunsetScoreService;
         this.starScoreService = starScoreService;
         this.sky = sky;
+        this.westSkyService = westSkyService;
     }
 
     // ===== 7일 예보 =====
@@ -127,28 +131,32 @@ public class ForecastService {
                 basedAt,
                 date,
                 dayIndex >= REFERENCE_FROM_DAY_INDEX,
-                toSunsetDetail(scores.sunsets().get(date)),
+                toSunsetDetail(scores.sunsets().get(date), scores.westSkies().get(date)),
                 toStarDetail(scores.stars().get(date), latitude, longitude)
         );
     }
 
     // ===== 공통 =====
 
-    /** 날짜별 노을·별 계산 결과 */
-    private record Scores(Map<LocalDate, DailySunsetForecast> sunsets, Map<LocalDate, DailyStarForecast> stars) {
+    /** 날짜별 노을·별 계산 결과와 서쪽 하늘 검사 결과 */
+    private record Scores(Map<LocalDate, DailySunsetForecast> sunsets,
+                          Map<LocalDate, DailyStarForecast> stars,
+                          Map<LocalDate, WestSky> westSkies) {
     }
 
     private Scores calculate(OpenMeteoForecastResponse weather, OpenMeteoAirQualityResponse airQuality,
                              double latitude, double longitude, LightPollution light) {
+        Map<LocalDate, WestSky> westSkies = westSkyService.check(weather, latitude, longitude);
+
         Map<LocalDate, DailySunsetForecast> sunsets = new HashMap<>();
-        for (DailySunsetForecast day : sunsetScoreService.forecast(weather, airQuality)) {
+        for (DailySunsetForecast day : sunsetScoreService.forecast(weather, airQuality, westSkies)) {
             sunsets.put(day.date(), day);
         }
         Map<LocalDate, DailyStarForecast> stars = new HashMap<>();
         for (DailyStarForecast night : starScoreService.forecast(weather, airQuality, latitude, longitude, light)) {
             stars.put(night.date(), night);
         }
-        return new Scores(sunsets, stars);
+        return new Scores(sunsets, stars, westSkies);
     }
 
     /**
@@ -238,7 +246,7 @@ public class ForecastService {
 
     // ===== 상세 만들기 =====
 
-    private ForecastDetailResponse.SunsetDetail toSunsetDetail(DailySunsetForecast day) {
+    private ForecastDetailResponse.SunsetDetail toSunsetDetail(DailySunsetForecast day, WestSky westSky) {
         if (day == null) {
             return null;
         }
@@ -259,8 +267,22 @@ public class ForecastService {
                 day.note(),
                 SunsetScoreRules.BASE_SCORE,
                 List.copyOf(lines),
-                score.missing()
+                score.missing(),
+                toWestSkyDetail(westSky)
         );
+    }
+
+    private ForecastDetailResponse.WestSkyDetail toWestSkyDetail(WestSky westSky) {
+        if (westSky == null) {
+            return null;
+        }
+        List<ForecastDetailResponse.WestSkyPoint> points = new ArrayList<>();
+        for (WestSky.Point point : westSky.points()) {
+            String status = point.status() == null ? null : point.status().label();
+            points.add(new ForecastDetailResponse.WestSkyPoint(point.distanceKm(), point.lowCloud(), status));
+        }
+        return new ForecastDetailResponse.WestSkyDetail(
+                (int) Math.round(westSky.azimuth()), westSky.direction(), List.copyOf(points));
     }
 
     private ForecastDetailResponse.StarDetail toStarDetail(DailyStarForecast night, double latitude, double longitude) {

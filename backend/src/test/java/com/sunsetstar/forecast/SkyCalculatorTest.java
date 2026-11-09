@@ -80,4 +80,26 @@ class SkyCalculatorTest {
                 LocalDateTime.of(2026, 3, 4, 5, 30),
                 LocalDateTime.of(2026, 3, 4, 8, 30));
     }
+
+    @Test
+    @DisplayName("해 지는 방향은 계절마다 다르다: 11월 약 249°, 춘분 약 270°, 하지 약 301°")
+    void sunsetAzimuthBySeason() {
+        double november = sky.sunAzimuth(LocalDateTime.of(2026, 11, 9, 17, 26), SEOUL_LAT, SEOUL_LON);
+        double equinox = sky.sunAzimuth(LocalDateTime.of(2026, 3, 20, 18, 40), SEOUL_LAT, SEOUL_LON);
+        double summer = sky.sunAzimuth(LocalDateTime.of(2026, 6, 21, 19, 57), SEOUL_LAT, SEOUL_LON);
+
+        assertThat(november).isBetween(245.0, 253.0);
+        assertThat(equinox).isBetween(266.0, 274.0);
+        assertThat(summer).isBetween(297.0, 305.0);
+    }
+
+    @Test
+    @DisplayName("방위각을 16방위 이름으로 바꾼다")
+    void directionNames() {
+        assertThat(SkyCalculator.directionName(249)).isEqualTo("서남서");
+        assertThat(SkyCalculator.directionName(270)).isEqualTo("서");
+        assertThat(SkyCalculator.directionName(292)).isEqualTo("서북서");
+        assertThat(SkyCalculator.directionName(0)).isEqualTo("북");
+        assertThat(SkyCalculator.directionName(359)).isEqualTo("북");
+    }
 }

@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static com.sunsetstar.forecast.SunsetScoreRules.*;
 
@@ -19,7 +20,7 @@ import static com.sunsetstar.forecast.SunsetScoreRules.*;
  * 같은 입력이면 항상 같은 점수가 나온다 (외부 호출 없음, 현재 시각을 쓰지 않음).
  *
  * 하는 일은 세 가지다.
- * - forecast: Open-Meteo 응답 → 날짜마다 일몰 시각 값 고르기 → 점수 → 추천 시간 (7일치)
+ * - forecast: Open-Meteo 응답(+ 서쪽 하늘 검사) → 날짜마다 일몰 시각 값 고르기 → 점수 → 추천 시간 (7일치)
  * - calculate: 일몰 시각 값(SunsetConditions) → 점수
  * - recommend: 일몰 시각 + 점수 → 추천 시간 또는 쉬는 날 안내
  *
@@ -47,6 +48,17 @@ public class SunsetScoreService {
      */
     public List<DailySunsetForecast> forecast(OpenMeteoForecastResponse weather,
                                               OpenMeteoAirQualityResponse airQuality) {
+        return forecast(weather, airQuality, Map.of());
+    }
+
+    /**
+     * 서쪽 하늘 검사 결과까지 넣어서 날짜마다 노을 예보를 만든다.
+     *
+     * @param westSkies 날짜 → 해 지는 쪽 하늘 검사 결과(WestSkyService). 없는 날짜는 ③을 0점으로 둔다
+     */
+    public List<DailySunsetForecast> forecast(OpenMeteoForecastResponse weather,
+                                              OpenMeteoAirQualityResponse airQuality,
+                                              Map<LocalDate, WestSky> westSkies) {
         OpenMeteoForecastResponse.Daily daily = weather.daily();
         List<DailySunsetForecast> days = new ArrayList<>();
 
@@ -56,7 +68,9 @@ public class SunsetScoreService {
             if (sunset == null) {
                 continue; // 일몰 시각이 없으면 그날은 계산할 수 없다
             }
-            SunsetConditions conditions = conditionsAtSunset(weather.hourly(), airQuality, sunset);
+            WestSky westSky = westSkies.get(date);
+            Integer westSkyLowCloud = westSky == null ? null : westSky.maxLowCloud();
+            SunsetConditions conditions = conditionsAtSunset(weather.hourly(), airQuality, sunset, westSkyLowCloud);
             SunsetScore score = calculate(conditions);
             days.add(recommend(date, sunset, score));
         }
@@ -71,7 +85,8 @@ public class SunsetScoreService {
      */
     SunsetConditions conditionsAtSunset(OpenMeteoForecastResponse.Hourly hourly,
                                         OpenMeteoAirQualityResponse airQuality,
-                                        LocalDateTime sunset) {
+                                        LocalDateTime sunset,
+                                        Integer westSkyLowCloud) {
         LocalDateTime sunsetHour = nearestHour(sunset);
         int i = hourly.time().indexOf(sunsetHour);
 
@@ -91,7 +106,7 @@ public class SunsetScoreService {
                 valueAt(hourly.cloudCoverHigh(), i),
                 valueAt(hourly.cloudCoverMid(), i),
                 valueAt(hourly.cloudCoverLow(), i),
-                null, // ③ 서쪽 하늘은 5단계(F3)에서 채운다
+                westSkyLowCloud, // ③ 서쪽 하늘: 세 지점 낮은 구름 최댓값 (검사 실패 시 null → 0점)
                 pm25,
                 valueAt(hourly.humidity(), i),
                 visibilityKm,
@@ -196,8 +211,8 @@ public class SunsetScoreService {
         return new Factor(HUMIDITY_NAME, 0, null);
     }
 
-    /** 가장 가까운 정각. 30분 이상이면 다음 정각으로 올린다. */
-    private LocalDateTime nearestHour(LocalDateTime time) {
+    /** 가장 가까운 정각. 30분 이상이면 다음 정각으로 올린다. 서쪽 하늘 검사(WestSkyService)도 같은 기준을 쓴다. */
+    static LocalDateTime nearestHour(LocalDateTime time) {
         LocalDateTime hour = time.truncatedTo(ChronoUnit.HOURS);
         return time.getMinute() >= 30 ? hour.plusHours(1) : hour;
     }
