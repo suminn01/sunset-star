@@ -46,7 +46,11 @@ public final class SunsetScoreRules {
     );
 
     // ===== ③ 서쪽 하늘 (세 지점 낮은 구름 중 최댓값, %) =====
-    // 5단계(be/west-sky, F3)에서 쓴다. 그 전까지 ③은 0점이다.
+    // 해 지는 방향으로 25·50·100km 떨어진 세 지점의 낮은 구름을 본다 (기능명세서 F3).
+    // 한 곳이라도 막히면 빛이 들어오지 못하므로 평균이 아니라 최댓값을 쓴다.
+
+    /** 검사 지점까지의 거리 (km) */
+    public static final List<Integer> WEST_SKY_DISTANCES_KM = List.of(25, 50, 100);
 
     public static final List<ScoreBand> WEST_SKY = List.of(
             new ScoreBand(0, 29, 10, "해 지는 쪽 하늘이 트여 있어요"),
