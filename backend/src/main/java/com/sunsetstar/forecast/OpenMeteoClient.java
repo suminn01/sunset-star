@@ -1,5 +1,8 @@
 package com.sunsetstar.forecast;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -17,11 +20,17 @@ import java.time.Duration;
  * 주소와 모델명은 OpenMeteoProperties(application.yml)에서 꺼내 쓰고,
  * 이 클래스에는 "무엇을 달라고 할지"만 적는다.
  *
+ * 같은 좌표의 응답은 1시간 동안 캐시에 보관한다(@Cacheable). 1시간 안에 같은 좌표를 다시 물으면
+ * Open-Meteo에 요청을 보내지 않고 보관해 둔 응답을 돌려준다. 좌표는 부르는 쪽(ForecastService)에서
+ * 소수점 둘째 자리로 반올림해서 넘긴다. 실패한 요청(예외)은 보관하지 않는다.
+ *
  * 응답이 늦거나 실패하면 RestClient가 예외를 던진다.
  * 재시도와 에러 응답({code, message}) 처리는 4단계(be/forecast-api)에서 붙인다.
  */
 @Component
 public class OpenMeteoClient {
+
+    private static final Logger log = LoggerFactory.getLogger(OpenMeteoClient.class);
 
     /** 모든 시각을 한국 시간으로 받는다. */
     private static final String TIMEZONE = "Asia/Seoul";
@@ -72,7 +81,10 @@ public class OpenMeteoClient {
      * 실제 요청 주소 예:
      * https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.978&hourly=cloud_cover,...
      */
+    @Cacheable("open-meteo-forecast")
     public OpenMeteoForecastResponse getForecast(double latitude, double longitude) {
+        // 캐시에 없을 때만 여기까지 온다. 콘솔에 이 줄이 찍히면 진짜로 Open-Meteo를 부른 것이다.
+        log.info("Open-Meteo 날씨 요청: {}, {}", latitude, longitude);
         return restClient.get()
                 .uri(properties.forecastUrl(), uri -> uri
                         .queryParam("latitude", latitude)
@@ -91,7 +103,9 @@ public class OpenMeteoClient {
      * 7일치 미세먼지 예보를 가져온다.
      * 날씨와 주소가 다른 API라서 요청을 따로 보낸다.
      */
+    @Cacheable("open-meteo-air-quality")
     public OpenMeteoAirQualityResponse getAirQuality(double latitude, double longitude) {
+        log.info("Open-Meteo 미세먼지 요청: {}, {}", latitude, longitude);
         return restClient.get()
                 .uri(properties.airQualityUrl(), uri -> uri
                         .queryParam("latitude", latitude)
