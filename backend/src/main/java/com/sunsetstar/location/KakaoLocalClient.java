@@ -2,6 +2,7 @@ package com.sunsetstar.location;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -85,7 +86,10 @@ public class KakaoLocalClient {
     /**
      * 좌표를 행정구역 이름으로 바꾼다.
      * 예: coordToRegion(37.5665, 126.978) → "서울특별시 중구 …"
+     *
+     * 같은 좌표는 1시간 캐시한다. 부르는 쪽(LocationService)이 좌표를 반올림해서 넘긴다.
      */
+    @Cacheable("kakao-region")
     public KakaoRegionResponse coordToRegion(double latitude, double longitude) {
         log.info("카카오 좌표 → 지역명: {}, {}", latitude, longitude);
         return restClient.get()

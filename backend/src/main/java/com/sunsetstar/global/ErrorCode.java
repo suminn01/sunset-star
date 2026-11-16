@@ -6,7 +6,8 @@ import org.springframework.http.HttpStatus;
  * 에러 종류 목록. 에러 응답 {code, message}의 code가 이 이름이다 (기능명세서 F8).
  *
  * 프런트는 code를 보고 화면을 정한다.
- * 예: WEATHER_UNAVAILABLE → "하늘 정보를 못 가져왔어요" + 다시 시도 버튼, INVALID_PARAMETER → 설정 화면으로 안내
+ * 예: WEATHER_UNAVAILABLE → "하늘 정보를 못 가져왔어요" + 다시 시도 버튼, INVALID_PARAMETER → 설정 화면으로 안내,
+ *     LOCATION_UNAVAILABLE → 위치 검색창에 안내 문구
  *
  * 로그인(8단계), 기록(9단계)을 만들 때 UNAUTHORIZED(401), FORBIDDEN(403), DUPLICATE_EMAIL(409)을 여기에 더한다.
  */
@@ -16,6 +17,8 @@ public enum ErrorCode {
     NOT_FOUND(HttpStatus.NOT_FOUND, "없는 주소예요"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식이에요"),
     WEATHER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "하늘 정보를 못 가져왔어요. 잠시 후 다시 시도해 주세요"),
+    LOCATION_NOT_FOUND(HttpStatus.NOT_FOUND, "이 위치의 지역 이름을 찾지 못했어요"),
+    LOCATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "지금은 위치를 찾지 못했어요. 잠시 후 다시 시도해 주세요"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "잠시 후 다시 시도해 주세요");
 
     private final HttpStatus status;
