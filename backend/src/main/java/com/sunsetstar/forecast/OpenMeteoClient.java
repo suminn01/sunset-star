@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
  * - getForecast: 7일치 시간별 구름·습도·시정·강수 + 날짜별 일출·일몰
  * - getAirQuality: 7일치 시간별 PM2.5·PM10
  * - getLowCloud: 여러 지점의 7일치 시간별 낮은 구름 (해 지는 쪽 하늘 검사, 요청 1번)
+ * - getForecasts, getAirQualities: 여러 지점의 날씨·미세먼지 (근처 장소 후보 20곳, 요청 1번씩)
  *
  * 주소와 모델명은 OpenMeteoProperties(application.yml)에서 꺼내 쓰고,
  * 이 클래스에는 "무엇을 달라고 할지"만 적는다.
@@ -151,5 +152,70 @@ public class OpenMeteoClient {
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<OpenMeteoForecastResponse>>() {
                 });
+    }
+
+    /**
+     * 여러 지점의 7일치 날씨를 한 번에 가져온다 (근처 장소 후보, 기능명세서 F5).
+     * 받는 항목은 getForecast와 같고, 지점마다 고도(elevation)도 함께 온다. 보낸 순서대로 돌려준다.
+     *
+     * Open-Meteo는 지점이 1곳이면 배열이 아니라 응답 하나만 돌려주므로, 1곳일 때는 getForecast로 묻는다.
+     */
+    @Cacheable("open-meteo-nearby-forecast")
+    public List<OpenMeteoForecastResponse> getForecasts(List<Coordinate> points) {
+        if (points.isEmpty()) {
+            return List.of();
+        }
+        if (points.size() == 1) {
+            return List.of(getForecast(points.getFirst().latitude(), points.getFirst().longitude()));
+        }
+        log.info("Open-Meteo 여러 지점 날씨 요청: {}곳", points.size());
+        return restClient.get()
+                .uri(properties.forecastUrl(), uri -> uri
+                        .queryParam("latitude", joinLatitudes(points))
+                        .queryParam("longitude", joinLongitudes(points))
+                        .queryParam("hourly", HOURLY_WEATHER)
+                        .queryParam("daily", DAILY_WEATHER)
+                        .queryParam("models", properties.model())
+                        .queryParam("timezone", TIMEZONE)
+                        .queryParam("forecast_days", FORECAST_DAYS)
+                        .build())
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<OpenMeteoForecastResponse>>() {
+                });
+    }
+
+    /**
+     * 여러 지점의 7일치 미세먼지를 한 번에 가져온다 (근처 장소 후보). 보낸 순서대로 돌려준다.
+     */
+    @Cacheable("open-meteo-nearby-air-quality")
+    public List<OpenMeteoAirQualityResponse> getAirQualities(List<Coordinate> points) {
+        if (points.isEmpty()) {
+            return List.of();
+        }
+        if (points.size() == 1) {
+            return List.of(getAirQuality(points.getFirst().latitude(), points.getFirst().longitude()));
+        }
+        log.info("Open-Meteo 여러 지점 미세먼지 요청: {}곳", points.size());
+        return restClient.get()
+                .uri(properties.airQualityUrl(), uri -> uri
+                        .queryParam("latitude", joinLatitudes(points))
+                        .queryParam("longitude", joinLongitudes(points))
+                        .queryParam("hourly", HOURLY_AIR_QUALITY)
+                        .queryParam("timezone", TIMEZONE)
+                        .queryParam("forecast_days", FORECAST_DAYS)
+                        .build())
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<OpenMeteoAirQualityResponse>>() {
+                });
+    }
+
+    /** 위도들을 쉼표로 잇는다. 예: "37.47,37.38,37.18" */
+    private String joinLatitudes(List<Coordinate> points) {
+        return points.stream().map(point -> String.valueOf(point.latitude())).collect(Collectors.joining(","));
+    }
+
+    /** 경도들을 쉼표로 잇는다. */
+    private String joinLongitudes(List<Coordinate> points) {
+        return points.stream().map(point -> String.valueOf(point.longitude())).collect(Collectors.joining(","));
     }
 }

@@ -162,8 +162,9 @@ public class ForecastService {
     /**
      * 날씨를 받는다. 실패하면 한 번 더 시도하고, 그래도 실패하면 503으로 답한다.
      * 일시적인 네트워크 문제는 바로 다시 시도하면 되는 경우가 많다.
+     * 근처 장소 추천(NearbyService)도 같은 방식으로 날씨를 받으려고 같은 패키지에 열어 둔다.
      */
-    private OpenMeteoForecastResponse fetchWeather(double latitude, double longitude) {
+    OpenMeteoForecastResponse fetchWeather(double latitude, double longitude) {
         try {
             return requireWeather(client.getForecast(latitude, longitude));
         } catch (RestClientException first) {
@@ -186,7 +187,7 @@ public class ForecastService {
     }
 
     /** 미세먼지는 없어도 점수를 낼 수 있어서, 실패하면 기록만 남기고 null로 넘긴다. */
-    private OpenMeteoAirQualityResponse fetchAirQualityOrNull(double latitude, double longitude) {
+    OpenMeteoAirQualityResponse fetchAirQualityOrNull(double latitude, double longitude) {
         try {
             return client.getAirQuality(latitude, longitude);
         } catch (RestClientException e) {

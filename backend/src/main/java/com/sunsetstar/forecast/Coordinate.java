@@ -36,4 +36,18 @@ public record Coordinate(double latitude, double longitude) {
 
         return new Coordinate(Math.toDegrees(lat2), Math.toDegrees(lon2));
     }
+
+    /**
+     * 다른 지점까지의 거리 (km). 지구가 둥글다는 것을 반영한 공식(하버사인)을 쓴다.
+     * 예: 서울시청 → 서쪽 100km 지점 = 100
+     */
+    public double distanceKm(Coordinate other) {
+        double lat1 = Math.toRadians(latitude);
+        double lat2 = Math.toRadians(other.latitude);
+        double dLat = lat2 - lat1;
+        double dLon = Math.toRadians(other.longitude - longitude);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
+    }
 }
