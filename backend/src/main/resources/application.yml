@@ -49,3 +49,8 @@ open-meteo:
   air-quality-url: https://air-quality-api.open-meteo.com/v1/air-quality
   geocoding-url: https://geocoding-api.open-meteo.com/v1/search
   model: best_match
+
+# 카카오 로컬 API (장소·주소 검색, 좌표 → 지역명, 근처 장소 검색)
+# REST API 키는 비밀값이라 여기 쓰지 않고 application-secret.yml의 kakao.rest-api-key에 둔다.
+kakao:
+  base-url: https://dapi.kakao.com
