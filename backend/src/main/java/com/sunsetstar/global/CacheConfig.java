@@ -17,6 +17,8 @@ import java.util.List;
  * | open-meteo-air-quality | 1시간     | 미세먼지                                |
  * | open-meteo-west-sky    | 1시간     | 해 지는 쪽 세 지점 낮은 구름 (F3)        |
  * | kakao-region           | 1시간     | 좌표 → 지역명 (F1)                      |
+ * | open-meteo-nearby-forecast    | 1시간 | 근처 장소 후보들의 날씨 (F5)        |
+ * | open-meteo-nearby-air-quality | 1시간 | 근처 장소 후보들의 미세먼지 (F5)    |
  * | nearby-candidates      | 하루      | 근처 장소 후보 목록 (F5, 카카오 호출 줄이기) |
  *
  * 이 Bean을 만들면 Spring Boot가 자동으로 만들던 캐시 관리자 대신 이것을 쓴다.
@@ -41,7 +43,9 @@ public class CacheConfig {
                 "open-meteo-forecast",
                 "open-meteo-air-quality",
                 "open-meteo-west-sky",
-                "kakao-region"));
+                "kakao-region",
+                "open-meteo-nearby-forecast",
+                "open-meteo-nearby-air-quality"));
         // 근처 장소 후보는 장소가 자주 바뀌지 않아서 하루 보관
         manager.registerCustomCache("nearby-candidates", Caffeine.newBuilder()
                 .maximumSize(MAX_ENTRIES)
