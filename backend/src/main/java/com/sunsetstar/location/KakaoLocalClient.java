@@ -15,6 +15,7 @@ import java.time.Duration;
  * 카카오 로컬 API에 요청을 보내고, 받은 JSON을 DTO에 담아 돌려주는 클래스.
  *
  * - searchKeyword: 장소 이름으로 검색 (예: "합정역")
+ * - searchKeywordNear: 내 위치 근처에서 가까운 순으로 장소 검색 (예: 근처 "전망대", F5)
  * - searchAddress: 주소로 검색 (예: "망원동", "월드컵로 212")
  * - coordToRegion: 좌표 → 행정구역 이름 (예: "서울 마포구 서교동")
  *
@@ -64,6 +65,33 @@ public class KakaoLocalClient {
                         .queryParam("query", query)
                         .queryParam("size", KEYWORD_SIZE)
                         .build())
+                .retrieve()
+                .body(KakaoKeywordResponse.class);
+    }
+
+    /**
+     * 내 위치 근처에서 가까운 순으로 장소를 검색한다 (근처 관측 장소 추천, F5).
+     * 예: searchKeywordNear("전망대", 37.57, 126.98, 10000, 15) → 반경 10km 안의 전망대, 가까운 순
+     *
+     * @param radiusMeters 검색 반경 (m, 카카오 최대 20000). null이면 반경 없이 가까운 순으로만 찾는다
+     * @param size         받을 개수 (카카오 최대 15)
+     */
+    public KakaoKeywordResponse searchKeywordNear(String query, double latitude, double longitude,
+                                                  Integer radiusMeters, int size) {
+        log.info("카카오 근처 장소 검색: {} ({}, {})", query, latitude, longitude);
+        return restClient.get()
+                .uri(uri -> {
+                    uri.path("/v2/local/search/keyword.json")
+                            .queryParam("query", query)
+                            .queryParam("x", longitude) // x = 경도
+                            .queryParam("y", latitude)  // y = 위도
+                            .queryParam("sort", "distance")
+                            .queryParam("size", size);
+                    if (radiusMeters != null) {
+                        uri.queryParam("radius", radiusMeters);
+                    }
+                    return uri.build();
+                })
                 .retrieve()
                 .body(KakaoKeywordResponse.class);
     }

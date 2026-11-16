@@ -48,4 +48,13 @@ class CoordinateTest {
         assertThat(result.latitude()).isCloseTo(37.5665, within(0.000001));
         assertThat(result.longitude()).isCloseTo(126.978, within(0.000001));
     }
+
+    @Test
+    @DisplayName("거리: 서쪽으로 100km 간 지점까지의 거리는 100km")
+    void distanceKm() {
+        Coordinate west100 = SEOUL.destination(270, 100);
+
+        assertThat(SEOUL.distanceKm(west100)).isCloseTo(100.0, within(0.01));
+        assertThat(SEOUL.distanceKm(SEOUL)).isCloseTo(0.0, within(0.000001));
+    }
 }
