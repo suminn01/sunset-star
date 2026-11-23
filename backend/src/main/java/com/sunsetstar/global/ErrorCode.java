@@ -22,6 +22,7 @@ public enum ErrorCode {
     LOCATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "지금은 위치를 찾지 못했어요. 잠시 후 다시 시도해 주세요"),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요해요"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "볼 수 있는 권한이 없어요"),
+    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 가입된 이메일이에요"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "잠시 후 다시 시도해 주세요");
 
     private final HttpStatus status;

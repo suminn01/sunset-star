@@ -5,7 +5,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.ErrorResponse;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -22,6 +24,8 @@ import java.util.Objects;
  * | 위도·경도 범위 밖 (@DecimalMin 등)      | 400  | INVALID_PARAMETER   |
  * | 필요한 값이 빠짐 (lat 없음)             | 400  | INVALID_PARAMETER   |
  * | 형식이 틀림 (lat=abc, light=ABC)        | 400  | INVALID_PARAMETER   |
+ * | 보낸 JSON 칸이 규칙에 안 맞음 (@Email 등) | 400  | INVALID_PARAMETER   |
+ * | 보낸 JSON을 읽을 수 없음                 | 400  | INVALID_PARAMETER   |
  * | 없는 주소, 지원하지 않는 방식 등 Spring 에러 | 404, 405 등 | NOT_FOUND 등   |
  * | 그 밖의 예상 못 한 에러                 | 500  | INTERNAL_ERROR      |
  */
@@ -45,6 +49,26 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .orElse(ErrorCode.INVALID_PARAMETER.message());
         return respond(ErrorCode.INVALID_PARAMETER, message);
+    }
+
+    /**
+     * 보낸 JSON(@RequestBody)의 칸이 @Email, @Size 같은 규칙에 안 맞을 때. 예: 회원가입 이메일 형식 오류.
+     * 여러 칸이 틀려도 첫 번째 문장 하나만 보여 준다.
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleBodyValidation(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getAllErrors().stream()
+                .map(MessageSourceResolvable::getDefaultMessage)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(ErrorCode.INVALID_PARAMETER.message());
+        return respond(ErrorCode.INVALID_PARAMETER, message);
+    }
+
+    /** 보낸 JSON을 읽을 수 없을 때. 예: 내용이 비어 있음, 괄호가 빠짐 */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException e) {
+        return respond(ErrorCode.INVALID_PARAMETER, "보낸 내용을 읽지 못했어요. JSON 형식을 확인해 주세요");
     }
 
     /** 꼭 필요한 값이 빠졌을 때. 예: lat 없이 요청 */
