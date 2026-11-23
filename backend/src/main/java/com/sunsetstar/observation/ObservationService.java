@@ -83,6 +83,12 @@ public class ObservationService {
                 page, result.getTotalPages(), result.getTotalElements(), result.hasNext());
     }
 
+    /** 내 적중률·추천 장소 만족도·알림 후 관측 수 */
+    @Transactional(readOnly = true)
+    public ObservationStatsResponse stats(LoginUser loginUser) {
+        return ObservationStatsResponse.from(observationRepository.findByUserId(loginUser.id()));
+    }
+
     /**
      * 기록 사진. 없는 기록 404, 남의 기록 403, 사진이 없거나 파일이 사라졌으면 404
      */

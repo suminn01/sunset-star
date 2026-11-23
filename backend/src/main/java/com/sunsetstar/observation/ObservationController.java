@@ -13,7 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +23,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.beans.PropertyEditorSupport;
 import java.time.Duration;
 
 /**
@@ -31,7 +35,7 @@ import java.time.Duration;
  * | POST /api/observations               | 기록 등록 (multipart/form-data) → 201             |
  * | GET  /api/observations?page=0        | 내 기록 목록, 최신순 20개씩                         |
  * | GET  /api/observations/{id}/photo    | 기록 사진 (남의 기록이면 403)                       |
- * (통계는 다음 커밋에서 추가)
+ * | GET  /api/observations/stats         | 내 예측 적중률, 추천 장소 만족도, 알림 후 관측 수       |
  */
 @Tag(name = "관측 기록", description = "직접 본 하늘 기록과 예측 적중률 (로그인 필요)")
 @RestController
@@ -42,6 +46,20 @@ public class ObservationController {
 
     public ObservationController(ObservationService observationService) {
         this.observationService = observationService;
+    }
+
+    /**
+     * 사진 칸이 파일이 아니라 빈 글자(photo=)로 오면 "사진 없음"으로 본다.
+     * Swagger는 파일을 안 고르면 photo= 를 빈 글자로 보내는데, 그대로 두면 글자를 파일로 바꾸지 못해 400이 난다.
+     */
+    @InitBinder
+    void allowEmptyPhoto(WebDataBinder binder) {
+        binder.registerCustomEditor(MultipartFile.class, new PropertyEditorSupport() {
+            @Override
+            public void setAsText(String text) {
+                setValue(null);
+            }
+        });
     }
 
     /**
@@ -65,6 +83,13 @@ public class ObservationController {
                                         @RequestParam(defaultValue = "0")
                                         @Min(value = 0, message = "페이지(page)는 0 이상이어야 해요") int page) {
         return observationService.list(user, page);
+    }
+
+    @Operation(summary = "내 관측 통계",
+            description = "예측 적중률(60점 이상+예뻤어요 / 60점 미만+별로였어요, 그냥 그래요는 뺌), 추천 장소 만족도, 알림 후 관측 수. 기록이 없으면 비율은 null")
+    @GetMapping("/stats")
+    public ObservationStatsResponse stats(@AuthenticationPrincipal LoginUser user) {
+        return observationService.stats(user);
     }
 
     /**
