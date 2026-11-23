@@ -9,7 +9,8 @@ import org.springframework.http.HttpStatus;
  * 예: WEATHER_UNAVAILABLE → "하늘 정보를 못 가져왔어요" + 다시 시도 버튼, INVALID_PARAMETER → 설정 화면으로 안내,
  *     LOCATION_UNAVAILABLE → 위치 검색창에 안내 문구
  *
- * 로그인(8단계), 기록(9단계)을 만들 때 UNAUTHORIZED(401), FORBIDDEN(403), DUPLICATE_EMAIL(409)을 여기에 더한다.
+ * 로그인이 필요한 API를 로그인 없이 부르면 UNAUTHORIZED(401), 남의 것을 보려 하면 FORBIDDEN(403)이다.
+ * 이 둘은 컨트롤러까지 가기 전에 SecurityErrorHandler가 응답한다.
  */
 public enum ErrorCode {
 
@@ -19,6 +20,8 @@ public enum ErrorCode {
     WEATHER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "하늘 정보를 못 가져왔어요. 잠시 후 다시 시도해 주세요"),
     LOCATION_NOT_FOUND(HttpStatus.NOT_FOUND, "이 위치의 지역 이름을 찾지 못했어요"),
     LOCATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "지금은 위치를 찾지 못했어요. 잠시 후 다시 시도해 주세요"),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요해요"),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "볼 수 있는 권한이 없어요"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "잠시 후 다시 시도해 주세요");
 
     private final HttpStatus status;
