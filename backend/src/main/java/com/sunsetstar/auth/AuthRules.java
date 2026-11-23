@@ -28,6 +28,7 @@ public final class AuthRules {
     public static final String EMAIL_TOO_LONG = "이메일은 100자 이하로 입력해 주세요";
     public static final String PASSWORD_INVALID = "비밀번호는 8~64자이고 영문과 숫자를 둘 다 넣어 주세요 (한글·공백 불가)";
     public static final String NICKNAME_INVALID = "닉네임은 2~10자로 입력해 주세요";
+    public static final String LOGIN_REQUIRED = "이메일과 비밀번호를 입력해 주세요";
 
     private AuthRules() {
     }

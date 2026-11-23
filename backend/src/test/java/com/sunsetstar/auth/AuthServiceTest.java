@@ -9,6 +9,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,7 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 회원가입 규칙 테스트 (기능명세서 F9).
+ * 회원가입·로그인 규칙 테스트 (기능명세서 F9).
  *
  * 진짜 DB 대신 Mockito로 만든 가짜 UserRepository를 쓴다.
  * when(...).thenReturn(...)으로 "이렇게 물으면 이렇게 답해" 하고 정해 둘 수 있다.
@@ -86,5 +88,57 @@ class AuthServiceTest {
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.INVALID_PARAMETER);
+    }
+
+    /** 가입해 둔 회원 (id 1). 비밀번호는 sunset2026 */
+    private User savedUser() {
+        User user = User.local("sumin@example.com", passwordEncoder.encode("sunset2026"), "노을러");
+        when(userRepository.findByEmail("sumin@example.com")).thenReturn(Optional.of(user));
+        return user;
+    }
+
+    private ErrorCode loginError(LoginRequest request) {
+        try {
+            authService.authenticate(request);
+        } catch (ApiException e) {
+            return e.errorCode();
+        }
+        throw new AssertionError("로그인에 실패해야 해요");
+    }
+
+    @Test
+    void 이메일과_비밀번호가_맞으면_로그인() {
+        savedUser();
+
+        LoginUser user = authService.authenticate(new LoginRequest("sumin@example.com", "sunset2026"));
+
+        assertThat(user.email()).isEqualTo("sumin@example.com");
+    }
+
+    @Test
+    void 로그인할_때도_이메일_대소문자는_구분하지_않는다() {
+        savedUser();
+
+        LoginUser user = authService.authenticate(new LoginRequest(" SUMIN@example.com", "sunset2026"));
+
+        assertThat(user.email()).isEqualTo("sumin@example.com");
+    }
+
+    @Test
+    void 비밀번호가_틀려도_없는_이메일이어도_똑같이_LOGIN_FAILED() {
+        savedUser();
+
+        assertThat(loginError(new LoginRequest("sumin@example.com", "wrong2026"))).isEqualTo(ErrorCode.LOGIN_FAILED);
+        assertThat(loginError(new LoginRequest("nobody@example.com", "sunset2026"))).isEqualTo(ErrorCode.LOGIN_FAILED);
+    }
+
+    @Test
+    void 내_정보는_회원이_없으면_401() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.me(99L))
+                .isInstanceOf(ApiException.class)
+                .extracting(e -> ((ApiException) e).errorCode())
+                .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 }
