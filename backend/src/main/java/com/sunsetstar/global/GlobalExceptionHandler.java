@@ -6,6 +6,8 @@ import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.Objects;
 
@@ -24,8 +27,9 @@ import java.util.Objects;
  * | 위도·경도 범위 밖 (@DecimalMin 등)      | 400  | INVALID_PARAMETER   |
  * | 필요한 값이 빠짐 (lat 없음)             | 400  | INVALID_PARAMETER   |
  * | 형식이 틀림 (lat=abc, light=ABC)        | 400  | INVALID_PARAMETER   |
- * | 보낸 JSON 칸이 규칙에 안 맞음 (@Email 등) | 400  | INVALID_PARAMETER   |
+ * | 보낸 JSON·폼 칸이 규칙에 안 맞음 (@Email 등) | 400  | INVALID_PARAMETER |
  * | 보낸 JSON을 읽을 수 없음                 | 400  | INVALID_PARAMETER   |
+ * | 사진이 10MB를 넘음                       | 400  | INVALID_PARAMETER   |
  * | 없는 주소, 지원하지 않는 방식 등 Spring 에러 | 404, 405 등 | NOT_FOUND 등   |
  * | 그 밖의 예상 못 한 에러                 | 500  | INTERNAL_ERROR      |
  */
@@ -58,17 +62,34 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleBodyValidation(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getAllErrors().stream()
-                .map(MessageSourceResolvable::getDefaultMessage)
+                .map(GlobalExceptionHandler::bindingMessage)
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(ErrorCode.INVALID_PARAMETER.message());
         return respond(ErrorCode.INVALID_PARAMETER, message);
     }
 
+    /**
+     * 칸 하나의 안내 문장.
+     * 형식이 아예 틀린 값(예: predictedScore=abc, rating=BEST)은 Spring이 영어 문장을 만들어서, 우리 문장으로 바꾼다.
+     */
+    private static String bindingMessage(ObjectError error) {
+        if (error instanceof FieldError field && field.isBindingFailure()) {
+            return "값의 형식이 올바르지 않아요: " + field.getField();
+        }
+        return error.getDefaultMessage();
+    }
+
     /** 보낸 JSON을 읽을 수 없을 때. 예: 내용이 비어 있음, 괄호가 빠짐 */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException e) {
         return respond(ErrorCode.INVALID_PARAMETER, "보낸 내용을 읽지 못했어요. JSON 형식을 확인해 주세요");
+    }
+
+    /** 올린 파일이 application.yml의 max-file-size(10MB)보다 클 때 */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleTooLargeUpload(MaxUploadSizeExceededException e) {
+        return respond(ErrorCode.INVALID_PARAMETER, "사진은 10MB 이하로 올려 주세요");
     }
 
     /** 꼭 필요한 값이 빠졌을 때. 예: lat 없이 요청 */
