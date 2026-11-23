@@ -22,6 +22,15 @@ spring:
 
 server:
   port: 8080
+  # 로그인 세션 (기능명세서 F9). 세션은 서버 메모리에 있어서 서버를 다시 켜면 다시 로그인해야 한다
+  servlet:
+    session:
+      timeout: 14d          # 14일 동안 아무 요청이 없으면 로그아웃
+      cookie:
+        max-age: 14d        # 브라우저를 닫았다 열어도 JSESSIONID 쿠키를 14일 동안 유지
+        http-only: true     # 자바스크립트가 쿠키를 읽지 못하게 (쿠키를 훔쳐 가는 공격 방지)
+        same-site: lax      # 다른 사이트에서 몰래 보낸 POST 요청에는 쿠키를 붙이지 않음 (CSRF를 끈 대신)
+        # secure: true      # 배포(HTTPS) 때 켠다. 켜면 http://localhost에서는 쿠키가 안 붙는다
 
 app:
   cors:

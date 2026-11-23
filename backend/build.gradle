@@ -24,6 +24,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
+    // 로그인·세션·접근 제어 (8단계). 비밀번호 BCrypt 암호화도 여기에 들어 있다
+    implementation 'org.springframework.boot:spring-boot-starter-security'
     // 캐시 저장소 (1시간 동안 Open-Meteo 응답을 메모리에 보관). 버전은 Spring Boot가 맞춰 준다
     implementation 'com.github.ben-manes.caffeine:caffeine'
     runtimeOnly 'com.mysql:mysql-connector-j'
