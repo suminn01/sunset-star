@@ -14,13 +14,22 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.json.JsonMapper;
 
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
+
 import java.math.BigDecimal;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -143,5 +152,62 @@ class ObservationServiceTest {
                 .isInstanceOf(ApiException.class)
                 .hasMessage("요소(factors) 형식이 올바르지 않아요");
         verify(photoStorage, never()).save(any());
+    }
+
+    /** DB에서 꺼낸 것처럼 id가 붙은 기록. ownerId = 기록 주인 회원 id */
+    private Observation storedObservation(long id, long ownerId, String photoPath) {
+        User owner = User.local("owner@example.com", "$2a$hash", "주인");
+        ReflectionTestUtils.setField(owner, "id", ownerId);
+        Observation observation = new Observation(owner, TODAY, SkyType.STAR,
+                new BigDecimal("37.5"), new BigDecimal("127.0"), 40, null, Rating.BAD,
+                null, null, null, false, false);
+        ReflectionTestUtils.setField(observation, "id", id);
+        observation.attachPhoto(photoPath);
+        return observation;
+    }
+
+    @Test
+    void 목록은_내_id로_20개씩_찾는다() {
+        Observation mine = storedObservation(5L, 1L, "3f2a1b4c-0000-0000-0000-000000000000.jpg");
+        Pageable firstPage = PageRequest.of(0, ObservationRules.PAGE_SIZE);
+        when(observationRepository.findByUserIdOrderByObservedDateDescIdDesc(eq(1L), eq(firstPage)))
+                .thenReturn(new PageImpl<>(List.of(mine), firstPage, 21));
+
+        ObservationPageResponse page = service.list(SUMIN, 0);
+
+        assertThat(page.items()).hasSize(1);
+        assertThat(page.items().get(0).photoUrl()).isEqualTo("/api/observations/5/photo");
+        assertThat(page.items().get(0).hit()).isTrue(); // 40점 + BAD = 적중
+        assertThat(page.totalCount()).isEqualTo(21);
+        assertThat(page.hasNext()).isTrue();
+    }
+
+    @Test
+    void 내_기록_사진은_꺼내_준다() {
+        String fileName = "3f2a1b4c-0000-0000-0000-000000000000.jpg";
+        when(observationRepository.findById(5L)).thenReturn(Optional.of(storedObservation(5L, 1L, fileName)));
+        PhotoStorage.StoredPhoto stored = new PhotoStorage.StoredPhoto(Path.of(fileName), "image/jpeg");
+        when(photoStorage.find(fileName)).thenReturn(Optional.of(stored));
+
+        assertThat(service.photo(SUMIN, 5L)).isEqualTo(stored);
+    }
+
+    @Test
+    void 남의_기록_사진은_403() {
+        when(observationRepository.findById(5L))
+                .thenReturn(Optional.of(storedObservation(5L, 2L, "3f2a1b4c-0000-0000-0000-000000000000.jpg")));
+
+        assertThat(errorOf(() -> service.photo(SUMIN, 5L))).isEqualTo(ErrorCode.FORBIDDEN);
+        verify(photoStorage, never()).find(any());
+    }
+
+    @Test
+    void 없는_기록이나_사진_없는_기록은_404() {
+        when(observationRepository.findById(9L)).thenReturn(Optional.empty());
+        when(observationRepository.findById(5L)).thenReturn(Optional.of(storedObservation(5L, 1L, null)));
+        when(photoStorage.find(null)).thenReturn(Optional.empty());
+
+        assertThat(errorOf(() -> service.photo(SUMIN, 9L))).isEqualTo(ErrorCode.OBSERVATION_NOT_FOUND);
+        assertThat(errorOf(() -> service.photo(SUMIN, 5L))).isEqualTo(ErrorCode.PHOTO_NOT_FOUND);
     }
 }

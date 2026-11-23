@@ -6,6 +6,8 @@ import com.sunsetstar.auth.UserRepository;
 import com.sunsetstar.forecast.Factor;
 import com.sunsetstar.global.ApiException;
 import com.sunsetstar.global.ErrorCode;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -26,6 +28,8 @@ import java.util.List;
  * 2. 요소(factors) JSON을 읽어 본다. 형식이 틀리면 400
  * 3. 사진 저장 (형식·크기가 틀리면 400, 디스크 실패면 사진 없이 계속)
  * 4. 세션의 사용자 id로 기록 저장. 좌표는 소수점 여섯째 자리까지 (DB 칸 DECIMAL(9,6))
+ *
+ * 조회: 목록·사진·통계 모두 내 기록만. 남의 기록 사진을 달라고 하면 403 FORBIDDEN
  */
 @Service
 public class ObservationService {
@@ -65,6 +69,32 @@ public class ObservationService {
         observation.attachPhoto(photoPath);
 
         return ObservationResponse.of(observationRepository.save(observation), factors);
+    }
+
+    /** 내 기록 목록, 최신순. page는 0부터 (0 = 첫 페이지) */
+    @Transactional(readOnly = true)
+    public ObservationPageResponse list(LoginUser loginUser, int page) {
+        Page<Observation> result = observationRepository.findByUserIdOrderByObservedDateDescIdDesc(
+                loginUser.id(), PageRequest.of(page, ObservationRules.PAGE_SIZE));
+        return new ObservationPageResponse(
+                result.getContent().stream()
+                        .map(observation -> ObservationResponse.of(observation, factorsOf(observation)))
+                        .toList(),
+                page, result.getTotalPages(), result.getTotalElements(), result.hasNext());
+    }
+
+    /**
+     * 기록 사진. 없는 기록 404, 남의 기록 403, 사진이 없거나 파일이 사라졌으면 404
+     */
+    @Transactional(readOnly = true)
+    public PhotoStorage.StoredPhoto photo(LoginUser loginUser, Long observationId) {
+        Observation observation = observationRepository.findById(observationId)
+                .orElseThrow(() -> new ApiException(ErrorCode.OBSERVATION_NOT_FOUND));
+        if (!observation.isOwnedBy(loginUser.id())) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "다른 사람의 기록은 볼 수 없어요");
+        }
+        return photoStorage.find(observation.getPhotoPath())
+                .orElseThrow(() -> new ApiException(ErrorCode.PHOTO_NOT_FOUND));
     }
 
     private void checkDate(LocalDate observedDate) {
