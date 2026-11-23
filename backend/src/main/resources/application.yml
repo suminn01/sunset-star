@@ -10,6 +10,11 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/sunset_star?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&createDatabaseIfNotExist=true
     driver-class-name: com.mysql.cj.jdbc.Driver
+  # 관측 기록 사진 업로드 크기 (ObservationRules.PHOTO_MAX_BYTES와 맞춘다)
+  servlet:
+    multipart:
+      max-file-size: 10MB     # 사진 한 장
+      max-request-size: 11MB  # 사진 + 기록 내용
   # 캐시 설정(보관 시간, 캐시 이름)은 global/CacheConfig.java에 있다.
   # 캐시마다 보관 시간이 달라서(예보 1시간, 근처 장소 후보 하루) 코드로 옮겼다.
   jpa:
@@ -35,6 +40,9 @@ server:
 app:
   cors:
     allowed-origins: http://localhost:5173
+  # 관측 기록 사진을 저장할 폴더. 서버를 켠 곳(backend 폴더) 기준이고, .gitignore에 들어 있어 커밋되지 않는다
+  upload:
+    dir: uploads
 
 # Swagger (API 문서와 실행 화면): http://localhost:8080/swagger-ui
 # 배포할 때는 아무나 API 목록을 보지 못하도록 두 값을 false로 바꾼다.

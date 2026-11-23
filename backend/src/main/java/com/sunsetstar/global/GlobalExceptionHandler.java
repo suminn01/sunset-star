@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.Objects;
 
@@ -26,6 +27,7 @@ import java.util.Objects;
  * | 형식이 틀림 (lat=abc, light=ABC)        | 400  | INVALID_PARAMETER   |
  * | 보낸 JSON 칸이 규칙에 안 맞음 (@Email 등) | 400  | INVALID_PARAMETER   |
  * | 보낸 JSON을 읽을 수 없음                 | 400  | INVALID_PARAMETER   |
+ * | 사진이 10MB를 넘음                       | 400  | INVALID_PARAMETER   |
  * | 없는 주소, 지원하지 않는 방식 등 Spring 에러 | 404, 405 등 | NOT_FOUND 등   |
  * | 그 밖의 예상 못 한 에러                 | 500  | INTERNAL_ERROR      |
  */
@@ -69,6 +71,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException e) {
         return respond(ErrorCode.INVALID_PARAMETER, "보낸 내용을 읽지 못했어요. JSON 형식을 확인해 주세요");
+    }
+
+    /** 올린 파일이 application.yml의 max-file-size(10MB)보다 클 때 */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleTooLargeUpload(MaxUploadSizeExceededException e) {
+        return respond(ErrorCode.INVALID_PARAMETER, "사진은 10MB 이하로 올려 주세요");
     }
 
     /** 꼭 필요한 값이 빠졌을 때. 예: lat 없이 요청 */
