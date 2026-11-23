@@ -33,6 +33,13 @@ public final class ObservationRules {
     /** 받는 사진 형식: JPG, PNG, WEBP (휴대폰 사진은 대부분 JPG로 올라온다) */
     public static final Set<String> PHOTO_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
+    /** 요소(factors) JSON 글자 최대 길이. 요소는 6~8개라 넉넉하다 */
+    public static final int FACTORS_MAX = 3000;
+
+    public static final String LAT_MESSAGE = "위도(latitude)는 -90 ~ 90 사이여야 해요";
+    public static final String LON_MESSAGE = "경도(longitude)는 -180 ~ 180 사이여야 해요";
+    public static final String SCORE_MESSAGE = "예측 점수(predictedScore)는 0~100이어야 해요";
+
     private ObservationRules() {
     }
 }
